@@ -1,16 +1,28 @@
-# Zsh
+# Dotfiles
 
-## Install
-https://dev.to/equiman/zsh-on-windows-without-wsl-4ah9
+Personal dotfiles and scripts for Windows, Linux and WSL.
 
-1. Install git bash
-1. Download zsh: https://packages.msys2.org/package/zsh?repo=msys&variant=x86_64
-1. Extract the archive with [PeaZip](https://peazip.github.io/) in `C:\Program Files\Git` to merge `etc` and `usr` folders.
+## Repository structure
 
+```
+.bashrc              # Bash config (cross-platform)
+.vimrc               # Vim config (cross-platform)
+.zsh                 # Zsh config (cross-platform)
+git-export-diff      # Export git diff to an update folder (cross-platform, bash)
+windows/.bin/        # Windows-specific scripts (php.bat, composer.bat)
+linux/.envrc         # direnv config for PHP version switching
+```
 
-## Configure
+## Cross-platform
 
-Add the following to the start of `.bashrc`
+### Shell setup (Zsh on Git Bash)
+
+**Prerequisites:** [Git for Windows](https://gitforwindows.org/)
+
+1. Download zsh from https://packages.msys2.org/package/zsh?repo=msys&variant=x86_64
+2. Extract the archive with [PeaZip](https://peazip.github.io/) in `C:\Program Files\Git` to merge `etc` and `usr` folders.
+
+The `.bashrc` sets UTF-8 encoding and launches zsh automatically:
 
 ```sh
 /c/Windows/System32/chcp.com 65001 > /dev/null 2>&1
@@ -20,13 +32,15 @@ if [ -t 1 ]; then
 fi
 ```
 
-## Install Oh My Zsh
+It also adds `~/.bin` to the front of `PATH` so that custom scripts take priority.
+
+### Oh My Zsh
 
 ```sh
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 ```
 
-## Configure theme
+#### Theme (Powerlevel10k)
 
 ```sh
 git clone https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/themes/powerlevel10k
@@ -34,7 +48,7 @@ git clone https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-~/.oh-my-zs
 
 Relaunch git bash or run `p10k configure`.
 
-## Plugins
+#### Plugins
 
 ```sh
 git clone https://github.com/zsh-users/zsh-autosuggestions.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
@@ -43,8 +57,49 @@ git clone https://github.com/Pilaton/OhMyZsh-full-autoupdate.git ${ZSH_CUSTOM:-~
 git clone https://github.com/jessarcher/zsh-artisan.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/artisan
 ```
 
-## Handle PHP versions
+### git-export-diff
+
+Exports all changed files between two git commits into an `update/` folder. Works on Linux, Windows (Git Bash) and WSL.
 
 ```sh
-npm install -g @inspirelectronics/win-pvm
+# Export diff between HEAD~1 and HEAD (default)
+git-export-diff
+
+# Export diff from a specific commit
+git-export-diff <ref>
+
+# Pretend mode (dry run)
+git-export-diff -p
+```
+
+Run `git-export-diff -h` for all options.
+
+### .phpversion
+
+Place a `.phpversion` file in your project root to pin the PHP version. Both `8.1` and `81` formats are supported. The Windows scripts and Linux direnv config both read this file and resolve the correct PHP binary.
+
+## Windows
+
+**Prerequisites:** [Laravel Herd](https://herd.laravel.com/windows)
+
+Copy `windows/.bin/php.bat` and `windows/.bin/composer.bat` to `~/.bin/`.
+
+These scripts read `.phpversion` from the current directory and resolve the PHP binary from Herd's installation at `~/.config/herd/bin/php<version>/php.exe`. If no `.phpversion` is found, they fall back to Herd's `which-php` command.
+
+The `.bashrc` adds `~/.bin` to the front of `PATH`, so these scripts take priority over Herd's default PHP.
+
+## Linux / WSL
+
+**Prerequisites:**
+- Multiple PHP versions installed (e.g. `php8.0`, `php8.1`, `php8.3` in `/usr/bin/`)
+- [direnv](https://direnv.net/) installed and hooked into your shell
+
+Copy `linux/.envrc` to your project root (or use it as a template in `~/.direnvrc`).
+
+The `.envrc` reads `.phpversion`, creates a symlink at `.direnv/bin/php` pointing to the correct PHP binary, and uses `PATH_add` to prepend it. Each project gets its own isolated PHP version  multiple terminals in different projects work independently.
+
+```sh
+# Allow direnv in a project
+cd /path/to/project
+direnv allow
 ```
