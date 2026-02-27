@@ -15,47 +15,9 @@ linux/.envrc         # direnv config for PHP version switching
 
 ## Cross-platform
 
-### Shell setup (Zsh on Git Bash)
+### .bashrc
 
-**Prerequisites:** [Git for Windows](https://gitforwindows.org/)
-
-1. Download zsh from https://packages.msys2.org/package/zsh?repo=msys&variant=x86_64
-2. Extract the archive with [PeaZip](https://peazip.github.io/) in `C:\Program Files\Git` to merge `etc` and `usr` folders.
-
-The `.bashrc` sets UTF-8 encoding and launches zsh automatically:
-
-```sh
-/c/Windows/System32/chcp.com 65001 > /dev/null 2>&1
-
-if [ -t 1 ]; then
-  exec zsh
-fi
-```
-
-It also adds `~/.bin` to the front of `PATH` so that custom scripts take priority.
-
-### Oh My Zsh
-
-```sh
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-```
-
-#### Theme (Powerlevel10k)
-
-```sh
-git clone https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/themes/powerlevel10k
-```
-
-Relaunch git bash or run `p10k configure`.
-
-#### Plugins
-
-```sh
-git clone https://github.com/zsh-users/zsh-autosuggestions.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
-git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
-git clone https://github.com/Pilaton/OhMyZsh-full-autoupdate.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/ohmyzsh-full-autoupdate
-git clone https://github.com/jessarcher/zsh-artisan.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/artisan
-```
+Adds `~/.bin` to the front of `PATH` so that custom scripts take priority. Also includes common git and Laravel aliases.
 
 ### git-export-diff
 
@@ -80,19 +42,53 @@ Place a `.phpversion` file in your project root to pin the PHP version. Both `8.
 
 ## Windows
 
-**Prerequisites:** [Laravel Herd](https://herd.laravel.com/windows)
+**Prerequisites:**
+- [Git for Windows](https://gitforwindows.org/)
+- [Laravel Herd](https://herd.laravel.com/windows)
+
+### Shell setup (Zsh on Git Bash)
+
+The `.bashrc` sets UTF-8 encoding via `chcp 65001` and launches zsh automatically when running in an interactive terminal.
+
+1. Download zsh from https://packages.msys2.org/package/zsh?repo=msys&variant=x86_64
+2. Extract the archive with [PeaZip](https://peazip.github.io/) in `C:\Program Files\Git` to merge `etc` and `usr` folders.
+
+### Oh My Zsh
+
+```sh
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+```
+
+#### Theme (Powerlevel10k)
+
+```sh
+git clone https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/themes/powerlevel10k
+```
+
+Relaunch git bash or run `p10k configure`.
+
+#### Plugins
+
+```sh
+git clone https://github.com/zsh-users/zsh-autosuggestions.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
+git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
+git clone https://github.com/Pilaton/OhMyZsh-full-autoupdate.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/ohmyzsh-full-autoupdate
+git clone https://github.com/jessarcher/zsh-artisan.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/artisan
+```
+
+### PHP version switching
 
 Copy `windows/.bin/php.bat` and `windows/.bin/composer.bat` to `~/.bin/`.
 
 These scripts read `.phpversion` from the current directory and resolve the PHP binary from Herd's installation at `~/.config/herd/bin/php<version>/php.exe`. If no `.phpversion` is found, they fall back to Herd's `which-php` command.
-
-The `.bashrc` adds `~/.bin` to the front of `PATH`, so these scripts take priority over Herd's default PHP.
 
 ## Linux / WSL
 
 **Prerequisites:**
 - Multiple PHP versions installed (e.g. `php8.0`, `php8.1`, `php8.3` in `/usr/bin/`)
 - [direnv](https://direnv.net/) installed and hooked into your shell
+
+### PHP version switching
 
 Copy `linux/.envrc` to your project root (or use it as a template in `~/.direnvrc`).
 
