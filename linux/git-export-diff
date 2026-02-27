@@ -1,0 +1,237 @@
+#!/bin/bash
+export LC_ALL=fr_FR.UTF-8
+### WARNING: this script won't work if there are too many changes
+
+# Increase max si of arguments
+ulimit -s 65536
+
+fromRef=""
+toRef=""
+pretend=""
+verbose=""
+openExplorer=""
+copyDeleted=""
+
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+        echo "Generates a tar archive off all differences between two commits"
+        echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+        echo "Usage"
+        echo "~~~~~~"
+        echo "Generate a tar archive off all differences between HEAD and <ref_to>"
+        echo "    deploy.sh <ref_to>"
+        echo ""
+        echo "Generate a tar archive off all differences between <ref_from> and <ref_to>"
+        echo "    deploy.sh <ref_from> <ref_to>"
+        echo ""
+        echo "Options"
+        echo "    -f|--ftp: Display the FTP command to remove deleted files"
+        echo "    -e: Open the update folder in the explorer"
+        echo "    -fc|--clip-ftp: Copy the FTP command to remove deleted files to the clipboard"
+        echo "    -h|--help: Display this help"
+        echo "    --ssh: Display SSH command to untar archive and unlink deleted files"
+        echo "    -p|--pretend: Don't create the actual archive and display a summary of all differences"
+        echo "    -x|--extract: Extract the generated archive to an 'update' directory."
+        echo "    -xr|--extract-rm: Extract the generated archive to an 'update' directory then delete the generated archive."
+        echo "    -xre: Extract the generated archive to an 'update' directory, delete the generated archive, display the deleted files and open the folder with changed files."
+        echo "    -xred: Extract the generated archive to an 'update' directory, delete the generated archive, clip the deleted files and open the folder with changed files."
+        echo "    -s|--staged: Compares HEAD with staging area."
+        echo "    -v|--verbose: Display changed files list"
+        exit 0 ;;
+
+        -f|--ftp) ftp="1"; shift ;;
+        -fc|--clip-ftp) ftpClip="1"; ftp="1"; shift ;;
+        -x|--extract) extract="1"; shift ;;
+        -xr|--extract-rm) extract="1"; rm="1"; shift ;;
+        -xre) extract="1"; rm="1"; openExplorer="1"; shift ;;
+        -xred) extract="1"; rm="1"; openExplorer="1"; copyDeleted="1" ; shift ;;
+        -uc|--clip-untar) untarClip="1"; shift ;;
+        -e) openExplorer="1"; shift ;;
+        -d) copyDeleted="1"; shift ;;
+        -v|--verbose) verbose="1"; shift ;;
+        -p|--pretend) pretend="1"; verbose="1"; shift ;;
+        --ssh) ssh="1"; shift ;;
+        -s|--staged) stagingArea="1"; shift ;;
+        -xs) extract="1"; stagingArea="1"; shift ;;
+        -xrs|-srx|-xrs|-sxr) extract="1"; rm="1"; stagingArea="1"; shift ;;
+        -xres|-xres|-sxre) extract="1"; rm="1"; stagingArea="1"; openExplorer="1"; shift ;;
+
+        -*) echo "unknown option: $1" >&2; exit 1;;
+
+        *)
+         if [[ $fromRef = "" ]] ; then
+            fromRef="$1"
+         else
+            echo "Too many arguments" >&2; exit 1
+         fi
+         shift ;;
+    esac
+done
+
+# Default to -xre behavior if no extraction flags were specified
+if [[ $extract = "" && $pretend = "" ]] ; then
+    extract="1"
+    rm="1"
+    openExplorer="1"
+fi
+
+if [[ $stagingArea = "1" ]] ; then
+    fromRef="--staged"
+elif [[ $fromRef = "" ]] ; then
+    fromRef="HEAD~1"
+fi
+
+toRef="HEAD"
+
+# Create a tar archive of all modified files
+if [[ $pretend = "" ]] ; then
+    upsertedFiles=()
+    while IFS= read -r -d '' file; do
+        upsertedFiles+=("$file")
+    done < <(git diff -z --name-only "$fromRef" --diff-filter=d)
+
+    chunkSizes="${#upsertedFiles[@]}"
+
+    # Deal with the Too many argument error when creating the archive
+    if [ "$chunkSizes" -gt 500 ]; then
+        filesChunks=()
+        counter=0
+        archivesCount=0
+        archives=()
+        for file in "${upsertedFiles[@]}"; do
+            filesChunks+=("$file")
+            counter=$((counter + 1))
+
+            if [ "$counter" -eq 500 ]; then
+                archives+=("update_$archivesCount.tar")
+                git archive --format=tar --output="update_$archivesCount.tar" HEAD "${filesChunks[@]}"
+
+                archivesCount=$((archivesCount + 1))
+                counter=0
+                filesChunks=()
+            fi
+        done
+
+        # Create archives with resulting files
+        if [ "$counter" -gt 0 ]; then
+            archives+=("update_$archivesCount.tar")
+            git archive --format=tar --output="update_$archivesCount.tar" HEAD "${filesChunks[@]}"
+        fi
+
+        rm -f update.tar
+        tar -cf update.tar --files-from /dev/null
+
+        for archive in "${archives[@]}"; do
+            tar -Af update.tar "$archive"
+        done
+
+        rm -f "${archives[@]}"
+    else
+        git archive --format=tar --output=update.tar HEAD "${upsertedFiles[@]}"
+    fi
+fi
+
+# Get moved and deleted files lit
+deletedFiles=()
+while IFS= read -r -d '' file; do
+    deletedFiles+=("$file")
+done < <(git diff -z "$fromRef" "$toRef" --name-only --diff-filter=D --no-renames)
+
+rmCmd=""
+ftpDeleCmd=""
+
+if [ "${#deletedFiles[@]}" -gt 0 ]; then
+    rmCmd="rm -f -- $(printf '%q ' "${deletedFiles[@]}")"
+    ftpDeleCmd="$(printf 'DELE %s\n' "${deletedFiles[@]}")"
+fi
+
+finalCmd='tar xzf update.tar -o && tar tf update.tar | while IFS= read -r p; do chown 10026:1003 "$p"; done'
+
+
+# Prepare rm command
+if [[ $rmCmd != "rm -f  " ]] ; then
+    theCmd="$rmCmd && $finalCmd"
+else
+    theCmd=$finalCmd
+fi
+
+changedFiles=()
+while IFS= read -r -d '' file; do
+    changedFiles+=("$file")
+done < <(git diff -z "$fromRef" "$toRef" --name-only --diff-filter=d --no-renames)
+
+
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+
+if [[ $pretend = "" ]] ; then
+    echo "update.tar archive of differences between "$fromRef" and "$toRef" generated!"
+else
+    echo "Pretend mode, no tar archive generated!"
+fi
+
+if [[ $ftpClip = "1" ]] ; then
+    echo $ftpDeleCmd | clip
+    echo "FTP command copied to clipboard: "$ftpDeleCmd""
+elif [[ $ftp = "1" ]] ; then
+    echo "FTP command"
+    echo "    "$ftpDeleCmd""
+    echo ""
+fi
+
+if [[ $ssh = "1" ]] ; then
+    echo "SSH command"
+    echo "    $theCmd"
+    echo ""
+fi
+
+if [[ $verbose = "1" ]] ; then
+    echo "Added and changed files:"
+    echo ""
+    printf '%s\n' "${changedFiles[@]}"
+    echo ""
+    echo ""
+    echo "Deleted files:"
+    echo ""
+    echo $deletedFiles
+fi
+
+untarCommand="tar -xf update.tar --directory update"
+
+if [[ $untarClip = "1" ]] ; then
+    echo $untarCommand | clip
+    echo "untar command copied to clipboard: "$untarCommand""
+fi
+
+if [[ $extract = "1" ]] ; then
+    rm -rf update/
+    mkdir update
+    tar -xf update.tar --directory update
+    echo "Differences copied to the update folder."
+
+    if [[ $openExplorer = "1" ]] ; then
+        if [[ "$(command -v explorer)" != "" ]]; then
+          explorer update
+        else
+          open "update"
+        fi
+    fi
+fi
+
+if [[ $verbose = "" ]] ; then
+    if [ "${#deletedFiles[@]}" -gt 0 ] ; then
+        if [[ $copyDeleted = "1" ]] ; then
+            printf 'rm -f -- %q ' "${deletedFiles[@]}" | clip
+            echo ""
+            echo "rm command copied to clipboard."
+        else
+            echo "The following files must be deleted files:"
+            echo ""
+            printf '%s\n' "${deletedFiles[@]}"
+        fi
+    fi
+fi
+
+if [[ $rm = "1" ]] ; then
+    rm update.tar
+fi
