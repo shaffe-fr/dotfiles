@@ -13,6 +13,60 @@ windows/.bin/        # Windows-specific scripts (php.bat, composer.bat)
 linux/.envrc         # direnv config for PHP version switching
 ```
 
+## Installation
+
+### Windows (PowerShell)
+
+```powershell
+# Clone the repo
+git clone git@github.com:shaffe-fr/dotfiles.git $env:TEMP\dotfiles
+
+# Shell config
+Copy-Item $env:TEMP\dotfiles\.bashrc $env:USERPROFILE\.bashrc -Force
+Copy-Item $env:TEMP\dotfiles\.vimrc $env:USERPROFILE\.vimrc -Force
+Copy-Item $env:TEMP\dotfiles\.zsh $env:USERPROFILE\.zsh -Force
+
+# PHP & Composer scripts
+New-Item -ItemType Directory -Path $env:USERPROFILE\.bin -Force
+Copy-Item $env:TEMP\dotfiles\windows\.bin\php.bat $env:USERPROFILE\.bin\php.bat -Force
+Copy-Item $env:TEMP\dotfiles\windows\.bin\composer.bat $env:USERPROFILE\.bin\composer.bat -Force
+
+# git-export-diff (usable from Git Bash)
+Copy-Item $env:TEMP\dotfiles\git-export-diff $env:USERPROFILE\.bin\git-export-diff -Force
+
+# Cleanup
+Remove-Item -Recurse -Force $env:TEMP\dotfiles
+```
+
+### Linux / WSL (Bash)
+
+```bash
+# Clone the repo
+git clone git@github.com:shaffe-fr/dotfiles.git /tmp/dotfiles
+
+# Shell config
+cp /tmp/dotfiles/.bashrc ~/.bashrc
+cp /tmp/dotfiles/.vimrc ~/.vimrc
+cp /tmp/dotfiles/.zsh ~/.zsh
+
+# git-export-diff
+mkdir -p ~/.bin
+cp /tmp/dotfiles/git-export-diff ~/.bin/git-export-diff
+chmod +x ~/.bin/git-export-diff
+
+# direnv .envrc template
+mkdir -p ~/.config/dotfiles
+cp /tmp/dotfiles/linux/.envrc ~/.config/dotfiles/.envrc
+
+# Install direnv if not present
+if ! command -v direnv &> /dev/null; then
+  sudo apt install direnv
+fi
+
+# Cleanup
+rm -rf /tmp/dotfiles
+```
+
 ## Cross-platform
 
 ### .bashrc
@@ -78,9 +132,7 @@ git clone https://github.com/jessarcher/zsh-artisan.git ${ZSH_CUSTOM:-~/.oh-my-z
 
 ### PHP version switching
 
-Copy `windows/.bin/php.bat` and `windows/.bin/composer.bat` to `~/.bin/`.
-
-These scripts read `.phpversion` from the current directory and resolve the PHP binary from Herd's installation at `~/.config/herd/bin/php<version>/php.exe`. If no `.phpversion` is found, they fall back to Herd's `which-php` command.
+The scripts in `~/.bin/` read `.phpversion` from the current directory and resolve the PHP binary from Herd's installation at `~/.config/herd/bin/php<version>/php.exe`. If no `.phpversion` is found, they fall back to Herd's `which-php` command.
 
 ## Linux / WSL
 
@@ -90,12 +142,11 @@ These scripts read `.phpversion` from the current directory and resolve the PHP 
 
 ### PHP version switching
 
-Copy `linux/.envrc` to your project root (or use it as a template in `~/.direnvrc`).
+Copy `linux/.envrc` to your project root:
 
-The `.envrc` reads `.phpversion`, creates a symlink at `.direnv/bin/php` pointing to the correct PHP binary, and uses `PATH_add` to prepend it. Each project gets its own isolated PHP version  multiple terminals in different projects work independently.
-
-```sh
-# Allow direnv in a project
-cd /path/to/project
+```bash
+cp ~/.config/dotfiles/.envrc /path/to/project/.envrc
 direnv allow
 ```
+
+The `.envrc` reads `.phpversion`, creates a symlink at `.direnv/bin/php` pointing to the correct PHP binary, and uses `PATH_add` to prepend it. Each project gets its own isolated PHP version  multiple terminals in different projects work independently.
