@@ -18,6 +18,10 @@ linux/.envrc         # direnv config for PHP version switching
 ### Windows (PowerShell)
 
 ```powershell
+# Prerequisites
+winget install Git.Git
+winget install BeyondCode.Herd
+
 # Clone the repo
 git clone git@github.com:shaffe-fr/dotfiles.git $env:TEMP\dotfiles
 
@@ -41,6 +45,9 @@ Remove-Item -Recurse -Force $env:TEMP\dotfiles
 ### Linux / WSL (Bash)
 
 ```bash
+# Prerequisites
+sudo apt install git direnv
+
 # Clone the repo
 git clone git@github.com:shaffe-fr/dotfiles.git /tmp/dotfiles
 
@@ -57,11 +64,6 @@ chmod +x ~/.bin/git-export-diff
 # direnv .envrc template
 mkdir -p ~/.config/dotfiles
 cp /tmp/dotfiles/linux/.envrc ~/.config/dotfiles/.envrc
-
-# Install direnv if not present
-if ! command -v direnv &> /dev/null; then
-  sudo apt install direnv
-fi
 
 # Cleanup
 rm -rf /tmp/dotfiles
@@ -95,10 +97,6 @@ Run `git-export-diff -h` for all options.
 Place a `.phpversion` file in your project root to pin the PHP version. Both `8.1` and `81` formats are supported. The Windows scripts and Linux direnv config both read this file and resolve the correct PHP binary.
 
 ## Windows
-
-**Prerequisites:**
-- [Git for Windows](https://gitforwindows.org/)
-- [Laravel Herd](https://herd.laravel.com/windows)
 
 ### Shell setup (Zsh on Git Bash)
 
@@ -135,10 +133,6 @@ git clone https://github.com/jessarcher/zsh-artisan.git ${ZSH_CUSTOM:-~/.oh-my-z
 The scripts in `~/.bin/` read `.phpversion` from the current directory and resolve the PHP binary from Herd's installation at `~/.config/herd/bin/php<version>/php.exe`. If no `.phpversion` is found, they fall back to Herd's `which-php` command.
 
 ## Linux / WSL
-
-**Prerequisites:**
-- Multiple PHP versions installed (e.g. `php8.0`, `php8.1`, `php8.3` in `/usr/bin/`)
-- [direnv](https://direnv.net/) installed and hooked into your shell
 
 ### PHP version switching
 
