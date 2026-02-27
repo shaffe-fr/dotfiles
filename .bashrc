@@ -4,7 +4,9 @@ if [ -t 1 ]; then
   exec zsh
 fi
 
-export NODE_PATH="C:\Users\Karel\AppData\Roaming\npm\node_modules"
+# Prioritize ~/.bin over system PATH
+export PATH="$HOME/.bin:$PATH"
+
 alias a="artisan"
 alias art="php artisan"
 alias dump="composer dump-autoload -o"
@@ -19,15 +21,8 @@ alias gri="git rebase -i"
 alias gra="git rebase --abort"
 alias grc="git rebase --continue"
 alias grs="git rebase --skip"
-alias php74="/c/tools/php74/php"
-alias php80="/c/tools/php80/php"
-alias php81="/c/tools/php81/php"
-alias c74="php74 /c/ProgramData/ComposerSetup/bin/composer.phar"
-alias c80="php80 /c/ProgramData/ComposerSetup/bin/composer.phar"
-alias c81="php81 /c/ProgramData/ComposerSetup/bin/composer.phar"
 
 function fixup() {
     git commit -a --fixup="$1"
     GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash "$1"~1
 }
-
