@@ -210,7 +210,9 @@ if [[ $extract = "1" ]] ; then
     echo "Differences copied to the update folder."
 
     if [[ $openExplorer = "1" ]] ; then
-        if [[ "$(command -v explorer)" != "" ]]; then
+        if [[ "$(command -v explorer-tab.cmd)" != "" ]]; then
+          explorer-tab.cmd update
+        elif [[ "$(command -v explorer)" != "" ]]; then
           explorer update
         else
           open "update"
