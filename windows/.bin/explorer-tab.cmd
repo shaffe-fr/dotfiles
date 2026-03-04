@@ -1,15 +1,14 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
-:: Si aucun argument n'est fourni, on utilise le dossier courant
 if "%~1"=="" (
     set "target=%cd%"
 ) else (
     set "target=%~f1"
 )
 
-:: Appel PowerShell pour forcer l'ouverture en onglet via l'objet COM Shell
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-    "$shell = New-Object -ComObject Shell.Application; $shell.Open('%target%')"
+if "!target:~-1!"=="\" set "target=!target:~0,-1!"
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0explorer-tab.ps1" "!target!"
 
 endlocal
