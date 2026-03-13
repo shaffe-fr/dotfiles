@@ -5,9 +5,10 @@ Personal dotfiles and scripts for Windows, Linux and WSL.
 ## Repository structure
 
 ```
-.bashrc              # Bash config (cross-platform)
+.bashrc              # Bash config (cross-platform, auto-launches zsh)
+.bash_aliases        # Bash/Zsh aliases and functions (git, PHP, Laravel)
 .vimrc               # Vim config (cross-platform)
-.zsh                 # Zsh config (cross-platform)
+.zsh                 # Zsh config (cross-platform, no framework)
 git-export-diff      # Export git diff to an update folder (cross-platform, bash)
 windows/.bin/        # Windows-specific scripts (php.bat, composer.bat)
 linux/.envrc         # direnv config for PHP version switching
@@ -22,11 +23,20 @@ linux/.envrc         # direnv config for PHP version switching
 winget install Git.Git
 winget install BeyondCode.Herd
 
+# Modern CLI tools
+winget install ajeetdsouza.zoxide
+winget install eza-community.eza
+winget install sharkdp.bat
+winget install sharkdp.fd
+winget install BurntSushi.ripgrep.MSVC
+winget install junegunn.fzf
+
 # Clone the repo
 git clone git@github.com:shaffe-fr/dotfiles.git $env:TEMP\dotfiles
 
 # Shell config
 Copy-Item $env:TEMP\dotfiles\.bashrc $env:USERPROFILE\.bashrc -Force
+Copy-Item $env:TEMP\dotfiles\.bash_aliases $env:USERPROFILE\.bash_aliases -Force
 Copy-Item $env:TEMP\dotfiles\.vimrc $env:USERPROFILE\.vimrc -Force
 Copy-Item $env:TEMP\dotfiles\.zsh $env:USERPROFILE\.zsh -Force
 
@@ -53,6 +63,7 @@ git clone git@github.com:shaffe-fr/dotfiles.git /tmp/dotfiles
 
 # Shell config
 cp /tmp/dotfiles/.bashrc ~/.bashrc
+cp /tmp/dotfiles/.bash_aliases ~/.bash_aliases
 cp /tmp/dotfiles/.vimrc ~/.vimrc
 cp /tmp/dotfiles/.zsh ~/.zsh
 
@@ -73,7 +84,36 @@ rm -rf /tmp/dotfiles
 
 ### .bashrc
 
-Adds `~/.bin` to the front of `PATH` so that custom scripts take priority. Also includes common git and Laravel aliases.
+Adds `~/.bin` to the front of `PATH` so that custom scripts take priority. Automatically launches zsh when running in an interactive terminal.
+
+### .zsh (Zsh config)
+
+Lightweight zsh configuration without any framework (no oh-my-zsh). Optimized for fast startup (~16ms) using:
+
+- Async compinit loading (deferred after first prompt)
+- Lazy-loaded nvm
+- Modern CLI tool aliases (see below)
+
+Plugins are loaded from `~/.zsh/plugins/`:
+
+```sh
+git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions.git ~/.zsh/plugins/zsh-autosuggestions
+git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting.git ~/.zsh/plugins/zsh-syntax-highlighting
+git clone --depth=1 https://github.com/zsh-users/zsh-completions.git ~/.zsh/plugins/zsh-completions
+```
+
+### Modern CLI tools
+
+The zsh config auto-detects and uses these tools when available:
+
+| Tool | Replaces | Install (winget) |
+|------|----------|------------------|
+| [zoxide](https://github.com/ajeetdsouza/zoxide) | `cd` | `ajeetdsouza.zoxide` |
+| [eza](https://github.com/eza-community/eza) | `ls` | `eza-community.eza` |
+| [bat](https://github.com/sharkdp/bat) | `cat` | `sharkdp.bat` |
+| [fd](https://github.com/sharkdp/fd) | `find` | `sharkdp.fd` |
+| [ripgrep](https://github.com/BurntSushi/ripgrep) | `grep` | `BurntSushi.ripgrep.MSVC` |
+| [fzf](https://github.com/junegunn/fzf) | Ctrl+R, Ctrl+T | `junegunn.fzf` |
 
 ### git-export-diff
 
@@ -100,33 +140,13 @@ Place a `.phpversion` file in your project root to pin the PHP version. Both `8.
 
 ### Shell setup (Zsh on Git Bash)
 
-The `.bashrc` sets UTF-8 encoding via `chcp 65001` and launches zsh automatically when running in an interactive terminal.
+The `.bashrc` launches zsh automatically when running in an interactive terminal.
 
-1. Download zsh from https://packages.msys2.org/package/zsh?repo=msys&variant=x86_64
-2. Extract the archive with [PeaZip](https://peazip.github.io/) in `C:\Program Files\Git` to merge `etc` and `usr` folders.
-
-### Oh My Zsh
-
-```sh
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-```
-
-#### Theme (Powerlevel10k)
-
-```sh
-git clone https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/themes/powerlevel10k
-```
-
-Relaunch git bash or run `p10k configure`.
-
-#### Plugins
-
-```sh
-git clone https://github.com/zsh-users/zsh-autosuggestions.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
-git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
-git clone https://github.com/Pilaton/OhMyZsh-full-autoupdate.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/ohmyzsh-full-autoupdate
-git clone https://github.com/jessarcher/zsh-artisan.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/artisan
-```
+1. Download the zsh package from the [MSYS2 repository](https://packages.msys2.org/packages/zsh)
+2. Extract the `.pkg.tar.zst` archive into `C:\Program Files\Git` (requires admin):
+   ```powershell
+   tar -xf zsh-5.9-5-x86_64.pkg.tar.zst -C "C:\Program Files\Git"
+   ```
 
 ### PHP version switching
 
@@ -143,4 +163,4 @@ cp ~/.config/dotfiles/.envrc /path/to/project/.envrc
 direnv allow
 ```
 
-The `.envrc` reads `.phpversion`, creates a symlink at `.direnv/bin/php` pointing to the correct PHP binary, and uses `PATH_add` to prepend it. Each project gets its own isolated PHP version  multiple terminals in different projects work independently.
+The `.envrc` reads `.phpversion`, creates a symlink at `.direnv/bin/php` pointing to the correct PHP binary, and uses `PATH_add` to prepend it. Each project gets its own isolated PHP version — multiple terminals in different projects work independently.
