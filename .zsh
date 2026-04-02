@@ -70,13 +70,9 @@ else
 fi
 
 if (( $+commands[bat] )); then
-  alias cat='bat --paging=never --style=plain'
-  alias catp='bat'
   export BAT_THEME="ansi"
 fi
 
-(( $+commands[fd] )) && alias find='fd'
-(( $+commands[rg] )) && alias grep='rg'
 
 if (( $+commands[zoxide] )); then
   eval "$(zoxide init zsh --cmd cd)"
@@ -92,6 +88,9 @@ if (( $+commands[fzf] )); then
   fi
 fi
 
+# --- Aliases partagés (bash/zsh) ---
+[[ -f ~/.bash_aliases ]] && source ~/.bash_aliases
+
 # --- Aliases ---
 alias ..='cd ..'
 alias ...='cd ../..'
@@ -106,11 +105,12 @@ alias a='php artisan'
 # --- Chargement paresseux de nvm ---
 if [[ -d "$HOME/.nvm" ]]; then
   lazy_nvm() {
-    unset -f nvm node npm npx
+    unfunction nvm node npm npx 2>/dev/null
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
     [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
   }
+  unalias nvm node npm npx 2>/dev/null
   nvm()  { lazy_nvm; nvm "$@"; }
   node() { lazy_nvm; node "$@"; }
   npm()  { lazy_nvm; npm "$@"; }
