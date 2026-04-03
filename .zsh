@@ -41,6 +41,8 @@ bindkey '^[[B' history-beginning-search-forward
 bindkey '^[[1;5C' forward-word
 bindkey '^[[1;5D' backward-word
 bindkey '^[[3~' delete-char
+bindkey '^[[H' beginning-of-line
+bindkey '^[[F' end-of-line
 
 # --- PATH & cdpath ---
 typeset -U path cdpath fpath
