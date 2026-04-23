@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ORIG_CD="$(pwd)"
+HERD_HOME="$USERPROFILE/.config/herd/bin"
+TARGET_PHP=""
+
+[[ -f "$HERD_HOME/php.bat" ]]  || exit 1
+[[ -f "$HERD_HOME/herd.phar" ]] || exit 1
+
+if [[ -f "$ORIG_CD/.phpversion" ]]; then
+  PHP_VER="$(tr -d '[:space:]' < "$ORIG_CD/.phpversion")"
+  PHP_VER="${PHP_VER/./}"          # 8.1 → 81
+  TARGET_PHP="$HERD_HOME/php${PHP_VER}/php.exe"
+else
+  TARGET_PHP="$(cmd //v:on //c "\"$HERD_HOME/php.bat\" \"$HERD_HOME/herd.phar\" which-php \"$ORIG_CD\"" 2>/dev/null | tr -d '\r')"
+fi
+
+[[ -z "$TARGET_PHP" ]] && exit 1
+[[ -f "$TARGET_PHP" ]] || exit 1
+
+"$TARGET_PHP" "$HERD_HOME/composer.phar" "$@"
