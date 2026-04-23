@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ORIG_CD="$(pwd)"
+HERD_HOME="$USERPROFILE/.config/herd/bin"
+XDEBUG_DIR="$PROGRAMFILES/Herd/resources/app.asar.unpacked/resources/bin/xdebug"
+TARGET_PHP=""
+PHP_VER=""
+
+[[ -f "$HERD_HOME/php.bat" ]]  || exit 1
+[[ -f "$HERD_HOME/herd.phar" ]] || exit 1
+
+# --- Resolve PHP version and executable ---
+if [[ -f "$ORIG_CD/.phpversion" ]]; then
+  PHP_VER="$(tr -d '[:space:]' < "$ORIG_CD/.phpversion")"
+  PHP_VER_NODOT="${PHP_VER/./}"
+  TARGET_PHP="$HERD_HOME/php${PHP_VER_NODOT}/php.exe"
+else
+  TARGET_PHP="$(cmd //v:on //c "\"$HERD_HOME/php.bat\" \"$HERD_HOME/herd.phar\" which-php \"$ORIG_CD\"" 2>/dev/null | tr -d '\r')"
+  # Extract version from path like .../php84/php.exe
+  PHP_FOLDER="$(basename "$(dirname "$TARGET_PHP")")"
+  PHP_NUM="${PHP_FOLDER#php}"
+  PHP_VER="${PHP_NUM:0:1}.${PHP_NUM:1}"
+fi
+
+[[ -z "$TARGET_PHP" ]] && exit 1
+[[ -f "$TARGET_PHP" ]] || exit 1
+
+# --- Resolve absolute extension_dir from php.exe location ---
+EXT_DIR="$(dirname "$TARGET_PHP")/ext"
+
+# --- Rewrite xdebug DLL path and strip -n flag ---
+ARGS=()
+XDEBUG_WIN_DIR="C:\\Program Files\\Herd\\resources\\app.asar.unpacked\\resources\\bin\\xdebug"
+for arg in "$@"; do
+  # Strip -n flag so our -d directives are not ignored
+  [[ "$arg" == "-n" ]] && continue
+  # Replace any xdebug-X.Y.dll found in the xdebug dir with the resolved version
+  for dll in "$XDEBUG_DIR"/xdebug-*.dll; do
+    [[ -f "$dll" ]] || continue
+    dll_name="$(basename "$dll")"
+    arg="${arg//$dll_name/xdebug-${PHP_VER}.dll}"
+  done
+  ARGS+=("$arg")
+done
+
+"$TARGET_PHP" -d "extension_dir=$EXT_DIR" "${ARGS[@]}"
