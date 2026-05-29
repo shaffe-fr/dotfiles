@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+XDEBUG_DIR="$PROGRAMFILES/Herd/resources/app.asar.unpacked/resources/bin/xdebug"
+
+# --- Usage ---
+usage() {
+  echo "Usage: toggle-xdebug [mode]"
+  echo ""
+  echo "Modes disponibles :"
+  echo "  debug          Debugging uniquement (défaut)"
+  echo "  coverage       Coverage uniquement"
+  echo "  debug,coverage Debug + coverage"
+  echo ""
+  echo "Exemples :"
+  echo "  toggle-xdebug              # active/désactive avec mode=debug"
+  echo "  toggle-xdebug coverage     # active/désactive avec mode=coverage"
+  echo "  toggle-xdebug debug,coverage"
+  exit 0
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+fi
+
+# Mode xdebug (défaut: debug)
+XDEBUG_MODE="${1:-debug}"
+
+# Valider le mode
+valid_modes=("debug" "coverage" "debug,coverage" "coverage,debug")
+if [[ ! " ${valid_modes[*]} " =~ " ${XDEBUG_MODE} " ]]; then
+  echo "❌ Mode invalide: $XDEBUG_MODE"
+  echo "   Modes valides: debug, coverage, debug,coverage"
+  exit 1
+fi
+
+# --- Récupérer le chemin du php.ini chargé ---
+php_ini=$(php --ini | awk -F': ' '/Loaded Configuration File/ {print $2}' | sed 's/^[[:space:]]*//')
+
+# Convertir le chemin Windows en chemin Git Bash
+if [[ "$php_ini" =~ ^[A-Z]: ]]; then
+  php_ini=$(cygpath -u "$php_ini")
+fi
+
+# Si vide ou '(none)', essayer Additional .ini files parsed
+if [[ -z "$php_ini" || "$php_ini" == "(none)" ]]; then
+  php_ini=$(php --ini | awk -F': ' '/Additional .ini files parsed/ {print $2}' | sed 's/^[[:space:]]*//')
+  if [[ "$php_ini" =~ ^[A-Z]: ]]; then
+    php_ini=$(cygpath -u "$php_ini")
+  fi
+fi
+
+if [[ -z "$php_ini" || "$php_ini" == "(none)" ]]; then
+  echo "❌ Chemin php.ini non trouvé."
+  exit 1
+fi
+
+echo "📄 php.ini: $php_ini"
+
+if [[ ! -f "$php_ini" ]]; then
+  echo "❌ Fichier php.ini introuvable: '$php_ini'"
+  exit 1
+fi
+
+# --- Résoudre la version PHP pour le chemin xdebug ---
+resolve_php_version() {
+  local ver
+  ver=$(php -r "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;" 2>/dev/null)
+  echo "$ver"
+}
+
+# --- Vérifier et insérer les paramètres requis juste après zend_extension ---
+ensure_xdebug_settings() {
+  local missing=()
+
+  if ! grep -qE '^xdebug\.discover_client_host\s*=\s*true' "$php_ini"; then
+    missing+=("xdebug.discover_client_host = true")
+  fi
+
+  if ! grep -qE '^xdebug\.start_with_request\s*=\s*yes' "$php_ini"; then
+    missing+=("xdebug.start_with_request = yes")
+  fi
+
+  # Vérifier que xdebug.mode correspond au mode demandé
+  local mode_line
+  mode_line=$(grep -E '^xdebug\.mode\s*=' "$php_ini" || true)
+  if [[ -z "$mode_line" ]]; then
+    missing+=("xdebug.mode = ${XDEBUG_MODE}")
+  else
+    # Extraire la valeur actuelle et comparer
+    local current_mode
+    current_mode=$(echo "$mode_line" | sed -E 's/^xdebug\.mode\s*=\s*//' | xargs)
+    if [[ "$current_mode" != "$XDEBUG_MODE" ]]; then
+      echo "   🔄 xdebug.mode actuel: $current_mode → $XDEBUG_MODE"
+      sed -E "s|^xdebug\.mode\s*=.*|xdebug.mode = ${XDEBUG_MODE}|" "$php_ini" > "$php_ini.tmp"
+      mv "$php_ini.tmp" "$php_ini"
+      echo "   ✅ Mis à jour: xdebug.mode = ${XDEBUG_MODE}"
+    fi
+  fi
+
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    echo "⚠️  Paramètres manquants dans php.ini :"
+    for param in "${missing[@]}"; do
+      echo "   - $param"
+    done
+    echo ""
+    read -rp "Voulez-vous les ajouter automatiquement ? [Y/n] " answer
+    answer=${answer:-Y}
+    if [[ "$answer" =~ ^[Yy]$ ]]; then
+      # Insérer les paramètres juste après la ligne zend_extension=...xdebug
+      local insert=""
+      for param in "${missing[@]}"; do
+        insert="${insert}${param}\n"
+        echo "   ✅ Ajouté: $param"
+      done
+      sed -E "/^zend_extension=.*xdebug/a\\
+${insert%\\n}" "$php_ini" > "$php_ini.tmp"
+      mv "$php_ini.tmp" "$php_ini"
+    else
+      echo "❌ Activation annulée. Ajoutez les paramètres manuellement."
+      exit 1
+    fi
+  fi
+}
+
+# --- Toggle xdebug ---
+if grep -qE '^;zend_extension=.*xdebug' "$php_ini"; then
+  echo "✅ Activation de xdebug (mode: ${XDEBUG_MODE})..."
+  sed -E 's|^;(zend_extension=.*xdebug)|\1|' "$php_ini" > "$php_ini.tmp"
+  mv "$php_ini.tmp" "$php_ini"
+  ensure_xdebug_settings
+
+elif grep -qE '^zend_extension=.*xdebug' "$php_ini"; then
+  echo "⏸️  Désactivation de xdebug..."
+  sed -E 's|^(zend_extension=.*xdebug)|;\1|' "$php_ini" > "$php_ini.tmp"
+  mv "$php_ini.tmp" "$php_ini"
+
+else
+  # Ligne xdebug non trouvée → tenter de l'ajouter depuis Herd
+  PHP_VER=$(resolve_php_version)
+  XDEBUG_DLL="$XDEBUG_DIR/xdebug-${PHP_VER}.dll"
+
+  if [[ ! -f "$XDEBUG_DLL" ]]; then
+    echo "❌ DLL xdebug introuvable: $XDEBUG_DLL"
+    exit 1
+  fi
+
+  # Convertir en chemin Windows pour php.ini
+  XDEBUG_WIN_PATH=$(cygpath -w "$XDEBUG_DLL")
+
+  echo "➕ Ajout de xdebug (${PHP_VER}, mode: ${XDEBUG_MODE}) dans php.ini..."
+  echo "" >> "$php_ini"
+  echo "zend_extension=${XDEBUG_WIN_PATH}" >> "$php_ini"
+  echo "✅ Ligne ajoutée: zend_extension=${XDEBUG_WIN_PATH}"
+  ensure_xdebug_settings
+fi
+
+echo "Done."
