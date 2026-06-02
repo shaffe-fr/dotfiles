@@ -35,19 +35,12 @@ if [[ ! " ${valid_modes[*]} " =~ " ${XDEBUG_MODE} " ]]; then
 fi
 
 # --- Récupérer le chemin du php.ini chargé ---
-php_ini=$(php --ini | awk -F': ' '/Loaded Configuration File/ {print $2}' | sed 's/^[[:space:]]*//')
+# On résout directement via php -r (compatible PHP 8.5+ qui refuse --ini après -d)
+php_ini=$(php -r "echo php_ini_loaded_file();" 2>/dev/null)
 
 # Convertir le chemin Windows en chemin Git Bash
 if [[ "$php_ini" =~ ^[A-Z]: ]]; then
   php_ini=$(cygpath -u "$php_ini")
-fi
-
-# Si vide ou '(none)', essayer Additional .ini files parsed
-if [[ -z "$php_ini" || "$php_ini" == "(none)" ]]; then
-  php_ini=$(php --ini | awk -F': ' '/Additional .ini files parsed/ {print $2}' | sed 's/^[[:space:]]*//')
-  if [[ "$php_ini" =~ ^[A-Z]: ]]; then
-    php_ini=$(cygpath -u "$php_ini")
-  fi
 fi
 
 if [[ -z "$php_ini" || "$php_ini" == "(none)" ]]; then
