@@ -11,8 +11,7 @@ if not exist "%HERD_HOME%\herd.phar" exit /b 1
 
 rem --- Resolve PHP version and executable ---
 if exist "%ORIG_CD%\.phpversion" (
-  set /p PHP_VER=<"%ORIG_CD%\.phpversion"
-  for /f "tokens=* delims= " %%V in ("!PHP_VER!") do set "PHP_VER=%%V"
+  for /f "usebackq delims=" %%V in ("%ORIG_CD%\.phpversion") do set "PHP_VER=%%V"
   set "PHP_VER_NODOT=!PHP_VER:.=!"
   set "TARGET_PHP=%HERD_HOME%\php!PHP_VER_NODOT!\php.exe"
 ) else (
@@ -61,14 +60,6 @@ pushd "%ORIG_CD%" || exit /b 1
 "!TARGET_PHP!" -d "extension_dir=!EXT_DIR!" !ALL_ARGS!
 set "EXIT_CODE=%ERRORLEVEL%"
 popd
-
-rem --- Sync Herd nginx config if .phpversion is present (skip if CWD is .bin) ---
-if /i not "%ORIG_CD%"=="%USERPROFILE%\.bin" (
-  if exist "%ORIG_CD%\.phpversion" (
-    for %%I in ("%ORIG_CD%") do set "FOLDER_NAME=%%~nxI"
-    call "%USERPROFILE%\.bin\sync-herd-php.bat" "%ORIG_CD%" "!FOLDER_NAME!.test"
-  )
-)
 
 exit /b !EXIT_CODE!
 

@@ -8,9 +8,7 @@ set "TARGET_PHP="
 if not exist "%HERD_HOME%\herd.phar" exit /b 1
 
 if exist "%ORIG_CD%\.phpversion" (
-  set /p PHP_VER=<"%ORIG_CD%\.phpversion"
-  rem Trim trailing spaces and CR
-  for /f "tokens=* delims= " %%V in ("!PHP_VER!") do set "PHP_VER=%%V"
+  for /f "usebackq delims=" %%V in ("%ORIG_CD%\.phpversion") do set "PHP_VER=%%V"
   rem Remove dot so both 8.1 and 81 work
   set "PHP_VER=!PHP_VER:.=!"
   set "TARGET_PHP=%HERD_HOME%\php!PHP_VER!\php.exe"
