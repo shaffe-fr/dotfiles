@@ -1,4 +1,6 @@
 @echo off
+if defined _PHP_BAT_RUNNING exit /b 1
+set "_PHP_BAT_RUNNING=1"
 setlocal EnableExtensions EnableDelayedExpansion
 
 set "ORIG_CD=%CD%"
@@ -59,4 +61,13 @@ pushd "%ORIG_CD%" || exit /b 1
 set "EXIT_CODE=%ERRORLEVEL%"
 popd
 
+rem --- Sync Herd nginx config if .phpversion is present (skip if CWD is .bin) ---
+if /i not "%ORIG_CD%"=="%USERPROFILE%\.bin" (
+  if exist "%ORIG_CD%\.phpversion" (
+    for %%I in ("%ORIG_CD%") do set "FOLDER_NAME=%%~nxI"
+    call "%USERPROFILE%\.bin\sync-herd-php.bat" "%ORIG_CD%" "!FOLDER_NAME!.test"
+  )
+)
+
 exit /b !EXIT_CODE!
+

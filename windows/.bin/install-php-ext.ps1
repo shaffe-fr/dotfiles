@@ -49,13 +49,8 @@ $ts = if ($ThreadSafe) { 'ts' } else { 'nts' }
 
 # --- Resolve PHP version ---
 if (-not $PhpVersion) {
-    $phpVersionFile = "$env:USERPROFILE\.bin\.phpversion"
-    if (Test-Path $phpVersionFile) {
-        $PhpVersion = (Get-Content $phpVersionFile -Raw).Trim()
-    } else {
-        Write-Error "Impossible de determiner la version PHP. Utilise -PhpVersion."
-        exit 1
-    }
+    Write-Error "Le parametre -PhpVersion est requis (ex: 8.4, 8.5)."
+    exit 1
 }
 
 $phpFolder = "php$($PhpVersion -replace '\.','')"
