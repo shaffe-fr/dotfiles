@@ -5,7 +5,6 @@ set "ORIG_CD=%CD%"
 set "HERD_HOME=%USERPROFILE%\.config\herd\bin"
 set "TARGET_PHP="
 
-if not exist "%HERD_HOME%\php.bat" exit /b 1
 if not exist "%HERD_HOME%\herd.phar" exit /b 1
 
 if exist "%ORIG_CD%\.phpversion" (
@@ -16,11 +15,15 @@ if exist "%ORIG_CD%\.phpversion" (
   set "PHP_VER=!PHP_VER:.=!"
   set "TARGET_PHP=%HERD_HOME%\php!PHP_VER!\php.exe"
 ) else (
-  pushd "%ORIG_CD%" || exit /b 1
+  rem Find the most recent php.exe under Herd to run which-php (avoids recursion via PATH)
+  set "BOOTSTRAP_PHP="
+  for /d %%D in ("%HERD_HOME%\php*") do (
+    if exist "%%D\php.exe" set "BOOTSTRAP_PHP=%%D\php.exe"
+  )
+  if not defined BOOTSTRAP_PHP exit /b 1
   for /f "usebackq delims=" %%A in (`
-    cmd /v:on /c ""%HERD_HOME%\php.bat" "%HERD_HOME%\herd.phar" which-php "%ORIG_CD%""
+    "!BOOTSTRAP_PHP!" "%HERD_HOME%\herd.phar" which-php "%ORIG_CD%"
   `) do set "TARGET_PHP=%%A"
-  popd
 )
 
 if not defined TARGET_PHP exit /b 1

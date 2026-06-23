@@ -7,7 +7,6 @@ XDEBUG_DIR="$PROGRAMFILES/Herd/resources/app.asar.unpacked/resources/bin/xdebug"
 TARGET_PHP=""
 PHP_VER=""
 
-[[ -f "$HERD_HOME/php.bat" ]]  || exit 1
 [[ -f "$HERD_HOME/herd.phar" ]] || exit 1
 
 # --- Resolve PHP version and executable ---
@@ -16,7 +15,13 @@ if [[ -f "$ORIG_CD/.phpversion" ]]; then
   PHP_VER_NODOT="${PHP_VER/./}"
   TARGET_PHP="$HERD_HOME/php${PHP_VER_NODOT}/php.exe"
 else
-  TARGET_PHP="$(cmd //v:on //c "\"$HERD_HOME/php.bat\" \"$HERD_HOME/herd.phar\" which-php \"$ORIG_CD\"" 2>/dev/null | tr -d '\r')"
+  # Find the most recent php.exe under Herd to run which-php (avoids recursion via PATH)
+  BOOTSTRAP_PHP=""
+  for d in "$HERD_HOME"/php*/php.exe; do
+    [[ -f "$d" ]] && BOOTSTRAP_PHP="$d"
+  done
+  [[ -z "$BOOTSTRAP_PHP" ]] && exit 1
+  TARGET_PHP="$("$BOOTSTRAP_PHP" "$HERD_HOME/herd.phar" which-php "$ORIG_CD" 2>/dev/null | tr -d '\r')"
   # Extract version from path like .../php84/php.exe
   PHP_FOLDER="$(basename "$(dirname "$TARGET_PHP")")"
   PHP_NUM="${PHP_FOLDER#php}"

@@ -1,6 +1,4 @@
 @echo off
-if defined _PHP_BAT_RUNNING exit /b 1
-set "_PHP_BAT_RUNNING=1"
 setlocal EnableExtensions EnableDelayedExpansion
 
 set "ORIG_CD=%CD%"
@@ -9,7 +7,6 @@ set "XDEBUG_DIR=%PROGRAMFILES%\Herd\resources\app.asar.unpacked\resources\bin\xd
 set "TARGET_PHP="
 set "PHP_VER="
 
-if not exist "%HERD_HOME%\php.bat" exit /b 1
 if not exist "%HERD_HOME%\herd.phar" exit /b 1
 
 rem --- Resolve PHP version and executable ---
@@ -19,11 +16,15 @@ if exist "%ORIG_CD%\.phpversion" (
   set "PHP_VER_NODOT=!PHP_VER:.=!"
   set "TARGET_PHP=%HERD_HOME%\php!PHP_VER_NODOT!\php.exe"
 ) else (
-  pushd "%ORIG_CD%" || exit /b 1
+  rem Find the most recent php.exe under Herd to run which-php (avoids recursion via PATH)
+  set "BOOTSTRAP_PHP="
+  for /d %%D in ("%HERD_HOME%\php*") do (
+    if exist "%%D\php.exe" set "BOOTSTRAP_PHP=%%D\php.exe"
+  )
+  if not defined BOOTSTRAP_PHP exit /b 1
   for /f "usebackq delims=" %%A in (`
-    cmd /v:on /c ""%HERD_HOME%\php.bat" "%HERD_HOME%\herd.phar" which-php "%ORIG_CD%""
+    "!BOOTSTRAP_PHP!" "%HERD_HOME%\herd.phar" which-php "%ORIG_CD%"
   `) do set "TARGET_PHP=%%A"
-  popd
   rem Extract version (e.g. php84 -> 8.4) from path like ...\php84\php.exe
   for %%F in ("!TARGET_PHP!") do set "PHP_DIR=%%~dpF"
   for %%D in ("!PHP_DIR:~0,-1!") do set "PHP_FOLDER=%%~nxD"
