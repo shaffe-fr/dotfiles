@@ -4,6 +4,26 @@
 
 skip_global_compinit=1
 ZSH_PLUGINS="$HOME/.zsh/plugins"
+ZSH_CACHE="$HOME/.zsh/cache"
+[[ -d $ZSH_CACHE ]] || mkdir -p $ZSH_CACHE
+
+# Chaque spawn de binaire natif coûte 20 à 40 ms sous MSYS. Le code
+# d'initialisation que ces outils émettent ne varie qu'avec leur version : le
+# mettre en cache et ne le régénérer que si l'exécutable est plus récent.
+_cached_init() {
+  local name=$1 bin=$2
+  shift 2
+  local cache=$ZSH_CACHE/init-$name.zsh
+  if [[ ! -s $cache || $bin -nt $cache ]]; then
+    "$@" >| $cache 2>/dev/null || return
+  fi
+  source $cache
+}
+
+# --- Détection terminal IDE (Kiro, VS Code, etc.) ---
+if [[ "$TERM_PROGRAM" == "kiro" ]] || [[ "$TERM_PROGRAM" == "vscode" ]] || [[ "$TERM" == "dumb" ]]; then
+  DISABLE_ZSH_VISUAL_PLUGINS=1
+fi
 
 # --- Historique ---
 HISTFILE=~/.zsh_history
@@ -17,6 +37,9 @@ setopt INC_APPEND_HISTORY
 HIST_STAMPS="yyyy-mm-dd"
 
 # --- Options shell ---
+# Requis par le qualificateur (#q...) du test de fraicheur de _deferred_init :
+# sans lui le test est toujours vrai et compinit -C devient inatteignable.
+setopt EXTENDED_GLOB
 setopt AUTO_CD
 setopt AUTO_PUSHD
 setopt PUSHD_IGNORE_DUPS
@@ -25,14 +48,39 @@ setopt INTERACTIVE_COMMENTS
 setopt NO_BEEP
 
 # --- Prompt minimaliste et rapide ---
-_fast_git_branch() {
-  local branch
-  branch=$(command git symbolic-ref --short HEAD 2>/dev/null) || return
-  echo " (%F{cyan}${branch}%f)"
+# La branche est calculée dans un hook precmd, pas dans PROMPT : une
+# substitution $(...) dans le prompt forke un sous-shell à chaque affichage.
+# La lecture directe de .git/HEAD évite en plus le fork de `git symbolic-ref`,
+# mesuré à 39 ms par prompt.
+_git_prompt_info=''
+
+_update_git_prompt() {
+  _git_prompt_info=''
+  local dir=$PWD head gitdir ref
+  while [[ -n $dir ]]; do
+    if [[ -f $dir/.git/HEAD ]]; then
+      head=$dir/.git/HEAD
+      break
+    elif [[ -f $dir/.git ]]; then
+      read -r gitdir < $dir/.git
+      gitdir=${gitdir#gitdir: }
+      [[ $gitdir == /* ]] || gitdir=$dir/$gitdir
+      [[ -f $gitdir/HEAD ]] && head=$gitdir/HEAD
+      break
+    fi
+    dir=${dir%/*}
+  done
+  [[ -n $head ]] || return
+  read -r ref < $head
+  if [[ $ref == ref:*refs/heads/* ]]; then
+    _git_prompt_info=" (%F{cyan}${ref#*refs/heads/}%f)"
+  elif [[ -n $ref ]]; then
+    _git_prompt_info=" (%F{red}${ref[1,7]}%f)"
+  fi
 }
 
 setopt PROMPT_SUBST
-PROMPT='%F{green}%~%f$(_fast_git_branch) %F{yellow}❯%f '
+PROMPT='%F{green}%~%f${_git_prompt_info} %F{yellow}❯%f '
 
 # --- Keybindings (emacs-style) ---
 bindkey -e
@@ -46,11 +94,17 @@ bindkey '^[[F' end-of-line
 
 # --- PATH & cdpath ---
 typeset -U path cdpath fpath
+# $APPDATA contient des antislashes que zsh interprète comme des échappements
+# (\U, \A, \R) : l'entrée obtenue est corrompue. Garder la forme POSIX.
+# /usr/bin est requis explicitement, sans quoi les coreutils MSYS manquent et
+# compdump échoue sur `mv` sans jamais écrire son dump.
 path=(
     $HOME/.bin
     $HOME/.local/bin
-    $APPDATA/Composer/vendor/bin
+    $HOME/AppData/Roaming/Composer/vendor/bin
     ./vendor/bin
+    /usr/bin
+    /bin
     $path
 )
 
@@ -77,7 +131,7 @@ fi
 
 
 if (( $+commands[zoxide] )); then
-  eval "$(zoxide init zsh --cmd cd)"
+  _cached_init zoxide $commands[zoxide] zoxide init zsh --cmd cd
 fi
 
 # --- fzf ---
@@ -123,17 +177,22 @@ export TERM=xterm-256color
 
 # --- Chargement asynchrone (après le premier prompt) ---
 autoload -Uz add-zsh-hook
+add-zsh-hook precmd _update_git_prompt
+_update_git_prompt
 
 _deferred_init() {
   # zsh-completions
   [[ -d "$ZSH_PLUGINS/zsh-completions/src" ]] && fpath=("$ZSH_PLUGINS/zsh-completions/src" $fpath)
 
-  # compinit
+  # Sans ce répertoire, compinit et le cache de complétion échouent en écriture :
+  # le dump est reconstruit intégralement à chaque shell.
+  [[ -d ~/.zsh/cache ]] || mkdir -p ~/.zsh/cache
+
   autoload -Uz compinit
-  if [[ -n ~/.zcompdump(#qN.mh+24) ]]; then
-    compinit
+  if [[ -n ~/.zsh/cache/zcompdump(#qN.mh+24) ]]; then
+    compinit -d ~/.zsh/cache/zcompdump
   else
-    compinit -C
+    compinit -C -d ~/.zsh/cache/zcompdump
   fi
   zstyle ':completion:*' menu select
   zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
@@ -144,22 +203,24 @@ _deferred_init() {
   zstyle ':completion:*:complete:(cd|pushd):*' tag-order \
       'local-directories named-directories'
 
-  # zsh-autosuggestions
-  if [[ -f "$ZSH_PLUGINS/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
+  # zsh-autosuggestions (désactivé dans les terminaux IDE)
+  if [[ -z "$DISABLE_ZSH_VISUAL_PLUGINS" ]] && [[ -f "$ZSH_PLUGINS/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
     source "$ZSH_PLUGINS/zsh-autosuggestions/zsh-autosuggestions.zsh"
     ZSH_AUTOSUGGEST_STRATEGY=(history completion)
     ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=20
-    bindkey '^ ' autosuggest-accept
+    bindkey '^f' autosuggest-accept
   fi
 
-  # zsh-syntax-highlighting (toujours en dernier)
-  if [[ -f "$ZSH_PLUGINS/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
+  # zsh-syntax-highlighting (désactivé dans les terminaux IDE, toujours en dernier)
+  if [[ -z "$DISABLE_ZSH_VISUAL_PLUGINS" ]] && [[ -f "$ZSH_PLUGINS/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
     source "$ZSH_PLUGINS/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
   fi
 
   # fzf keybindings
+  # fzf.exe est un binaire Windows natif : il ne sait pas lire le /dev/fd/N
+  # d'une substitution de processus MSYS. Passer par un fichier de cache.
   if (( $+commands[fzf] )); then
-    source <(fzf --zsh 2>/dev/null) || true
+    _cached_init fzf $commands[fzf] fzf --zsh
   fi
 
   add-zsh-hook -d precmd _deferred_init
